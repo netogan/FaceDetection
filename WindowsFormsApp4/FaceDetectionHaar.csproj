@@ -104,6 +104,7 @@
     <Content Include="cvextern.dll">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <Content Include="frontalEyes35x16.xml" />
     <Content Include="haarcascade_eye.xml" />
     <Content Include="haarcascade_frontalface_default.xml" />
     <Content Include="haarcascade_mcs_lefteye.xml" />
