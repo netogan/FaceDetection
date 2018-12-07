@@ -111,6 +111,7 @@
     <Content Include="haarcascade_mcs_mouth.xml" />
     <Content Include="haarcascade_mcs_nose.xml" />
     <Content Include="haarcascade_mcs_righteye.xml" />
+    <Content Include="haarcascade_profileface.xml" />
     <Content Include="opencv_calib3d220.dll">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>

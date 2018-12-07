@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 using Emgu.CV;
@@ -24,17 +25,29 @@ namespace FaceDetectionHaar
 
             var haarFace = new HaarCascade(@"..\..\haarcascade_frontalface_default.xml");
 
-            var haarEye = new HaarCascade(@"..\..\frontalEyes35x16.xml");
-
-            var haarMouth = new HaarCascade(@"..\..\haarcascade_mcs_mouth.xml");
-
-            var haarNose = new HaarCascade(@"..\..\haarcascade_mcs_nose.xml");
-
             var gray = imagem.Convert<Gray, byte>();
 
             gray._EqualizeHist();
 
             var facesDetected = gray.DetectHaarCascade(haarFace, 1.05, 10, HAAR_DETECTION_TYPE.DO_CANNY_PRUNING, new Size(24, 24))[0];
+
+            if (facesDetected.Length == 0)
+                ProcessarFacePerfil(imagem, gray);
+
+            ProcessarItensDaFace(facesDetected, imagem, gray);
+
+            pictureBox1.Image = imagem.Bitmap;
+        }
+
+        private void ProcessarItensDaFace(IEnumerable<MCvAvgComp> facesDetected, Image<Bgr, byte> imagem, Image<Gray, byte> gray)
+        {
+            var existeItens = false;
+
+            var haarEye = new HaarCascade(@"..\..\frontalEyes35x16.xml");
+
+            var haarMouth = new HaarCascade(@"..\..\haarcascade_mcs_mouth.xml");
+
+            var haarNose = new HaarCascade(@"..\..\haarcascade_mcs_nose.xml");
 
             foreach (var face in facesDetected)
             {
@@ -48,7 +61,7 @@ namespace FaceDetectionHaar
                 var eyeLeftDetected = gray.DetectHaarCascade(haarLeftEye, 1.2, 3, HAAR_DETECTION_TYPE.DO_CANNY_PRUNING, new Size(22, 5))[0];
                 var eyeRightDetected = gray.DetectHaarCascade(haarRigthEye, 1.2, 3, HAAR_DETECTION_TYPE.DO_CANNY_PRUNING, new Size(22, 5))[0];
 
-                if(eyesDetected.Length == 0 && (eyeRightDetected.Length == 0 && eyeRightDetected.Length == 0)) continue;
+                if (eyesDetected.Length == 0 && (eyeRightDetected.Length == 0 && eyeRightDetected.Length == 0)) continue;
 
                 var mouthsDetected = gray.DetectHaarCascade(haarMouth, 1.2, 3, HAAR_DETECTION_TYPE.DO_CANNY_PRUNING, new Size(25, 15))[0];
 
@@ -56,15 +69,43 @@ namespace FaceDetectionHaar
 
                 gray.ROI = Rectangle.Empty;
 
-                var raio = (face.rect.Width + face.rect.Height) / (2 * 3.14159265359);
+                if (eyesDetected.Length <= 0 && (eyeLeftDetected.Length <= 0 || eyeRightDetected.Length <= 0))
+                {
+                    continue;
+                }
 
-                if ((eyesDetected.Length > 0 || (eyeLeftDetected.Length > 0 && eyeRightDetected.Length > 0)) && (mouthsDetected.Length > 0 || nosesDetected.Length > 0))
-                    //imagem.Draw(new CircleF(new PointF(face.rect.X * 2, face.rect.Y * 2 ), (float) raio) , new Bgr(Color.Purple), 3);
-                    imagem.Draw(new CircleF(new Point(face.rect.Width * 2, face.rect.Height * 2), 20), new Bgr(Color.Brown), 1);
+                if (mouthsDetected.Length <= 0 && nosesDetected.Length <= 0)
+                {
+                    continue;
+                }
 
+                existeItens = true;
+
+                var g = Graphics.FromImage(imagem.Bitmap);
+
+                g.DrawEllipse(new Pen(Color.Brown), face.rect);
+
+                var imgFace = imagem.Copy();
+
+                imgFace.ROI = face.rect;
+
+                pictureBox2.Image = imgFace.Bitmap;
+
+                //imagem.Draw(face.rect, new Bgr(Color.Brown), 3);
             }
 
-            pictureBox1.Image = imagem.Bitmap;
+            if(!existeItens)
+                ProcessarFacePerfil(imagem, gray);
+        }
+
+        private void ProcessarFacePerfil(Image<Bgr, byte> imagem, Image<Gray, byte> gray)
+        {
+            var haarFaceProf = new HaarCascade(@"..\..\haarcascade_profileface.xml");
+
+            var facesProfDetected = gray.DetectHaarCascade(haarFaceProf, 1.05, 3, HAAR_DETECTION_TYPE.DO_CANNY_PRUNING, new Size(24, 24))[0];
+
+            if (facesProfDetected.Length > 0)
+                ProcessarItensDaFace(facesProfDetected, imagem, gray);
         }
     }
 }
