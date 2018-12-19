@@ -1,10 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Imaging;
+using System.Linq;
+using System.Windows;
 using System.Windows.Forms;
 using Emgu.CV;
 using Emgu.CV.CvEnum;
 using Emgu.CV.Structure;
+using Size = System.Drawing.Size;
 
 namespace FaceDetectionHaar
 {
@@ -23,89 +27,76 @@ namespace FaceDetectionHaar
 
             var imagem = new Image<Bgr, byte>(ofd.FileName);
 
-            var haarFace = new HaarCascade(@"..\..\haarcascade_frontalface_default.xml");
+            var _classifierFrontalFace = new CascadeClassifier(@"..\..\objetos\haarcascade_frontalface_default.xml");
 
-            var gray = imagem.Convert<Gray, byte>();
+            var _classifierEyes = new CascadeClassifier(@"..\..\objetos\haarcascade_eye.xml");
+            var _classifierEyeLeft = new CascadeClassifier(@"..\..\objetos\eye_left18x12.xml");
+            var _classifierEyeRight = new CascadeClassifier(@"..\..\objetos\eye_right18x12.xml");
 
-            gray._EqualizeHist();
+            var _classifierMouth = new CascadeClassifier(@"..\..\objetos\haarcascade_mcs_mouth.xml");
+            var _classifieNose = new CascadeClassifier(@"..\..\objetos\haarcascade_mcs_nose.xml");
+            var _classifieNose25x15 = new CascadeClassifier(@"..\..\objetos\nariz_25x15.xml");
 
-            var facesDetected = gray.DetectHaarCascade(haarFace, 1.05, 10, HAAR_DETECTION_TYPE.DO_CANNY_PRUNING, new Size(24, 24))[0];
+            var gray = ConverterParaImageGray(imagem, null);
 
-            if (facesDetected.Length == 0)
-                ProcessarFacePerfil(imagem, gray);
+            var facesDetected = _classifierFrontalFace.DetectMultiScale(gray, 1.01, 3, new Size(24, 24));
 
-            ProcessarItensDaFace(facesDetected, imagem, gray);
-
-            pictureBox1.Image = imagem.Bitmap;
-        }
-
-        private void ProcessarItensDaFace(IEnumerable<MCvAvgComp> facesDetected, Image<Bgr, byte> imagem, Image<Gray, byte> gray)
-        {
-            var existeItens = false;
-
-            var haarEye = new HaarCascade(@"..\..\frontalEyes35x16.xml");
-
-            var haarMouth = new HaarCascade(@"..\..\haarcascade_mcs_mouth.xml");
-
-            var haarNose = new HaarCascade(@"..\..\haarcascade_mcs_nose.xml");
+            var faceValida = new List<Rectangle>();
 
             foreach (var face in facesDetected)
             {
-                gray.ROI = face.rect;
+                var grayFace = ConverterParaImageGray(imagem, face);
 
-                var eyesDetected = gray.DetectHaarCascade(haarEye, 1.05, 3, HAAR_DETECTION_TYPE.DO_CANNY_PRUNING, new Size(45, 11))[0];
+                var eyesDetected = _classifierEyes.DetectMultiScale(grayFace, 1.01, 1);
 
-                var haarLeftEye = new HaarCascade(@"..\..\haarcascade_mcs_lefteye.xml");
-                var haarRigthEye = new HaarCascade(@"..\..\haarcascade_mcs_righteye.xml");
+                var bocasDetectadas = _classifierMouth.DetectMultiScale(grayFace, 1.01, 1);
 
-                var eyeLeftDetected = gray.DetectHaarCascade(haarLeftEye, 1.2, 3, HAAR_DETECTION_TYPE.DO_CANNY_PRUNING, new Size(22, 5))[0];
-                var eyeRightDetected = gray.DetectHaarCascade(haarRigthEye, 1.2, 3, HAAR_DETECTION_TYPE.DO_CANNY_PRUNING, new Size(22, 5))[0];
+                var narizesDetectados = new Rectangle[]{};
 
-                if (eyesDetected.Length == 0 && (eyeRightDetected.Length == 0 && eyeRightDetected.Length == 0)) continue;
+                narizesDetectados = _classifieNose.DetectMultiScale(grayFace, 1.01, 1, new Size(25, 25));
 
-                var mouthsDetected = gray.DetectHaarCascade(haarMouth, 1.2, 3, HAAR_DETECTION_TYPE.DO_CANNY_PRUNING, new Size(25, 15))[0];
+                if(narizesDetectados.Length == 0)
+                    narizesDetectados = _classifieNose25x15.DetectMultiScale(grayFace, 1.01, 1, new Size(25, 25));
 
-                var nosesDetected = gray.DetectHaarCascade(haarNose, 1.2, 3, HAAR_DETECTION_TYPE.DO_CANNY_PRUNING, new Size(25, 15))[0];
-
-                gray.ROI = Rectangle.Empty;
-
-                if (eyesDetected.Length <= 0 && (eyeLeftDetected.Length <= 0 || eyeRightDetected.Length <= 0))
-                {
-                    continue;
-                }
-
-                if (mouthsDetected.Length <= 0 && nosesDetected.Length <= 0)
-                {
-                    continue;
-                }
-
-                existeItens = true;
-
-                var g = Graphics.FromImage(imagem.Bitmap);
-
-                g.DrawEllipse(new Pen(Color.Brown), face.rect);
-
-                var imgFace = imagem.Copy();
-
-                imgFace.ROI = face.rect;
-
-                pictureBox2.Image = imgFace.Bitmap;
-
-                //imagem.Draw(face.rect, new Bgr(Color.Brown), 3);
+                if (eyesDetected.Length > 0 && bocasDetectadas.Length > 0 && narizesDetectados.Length > 0)
+                    faceValida.Add(face);
             }
 
-            if(!existeItens)
-                ProcessarFacePerfil(imagem, gray);
+            if (faceValida.Count == 1)
+            {
+                var grayFaceValida = ConverterParaImageGray(imagem, faceValida[0]);
+
+                var eyeEsquerdo = _classifierEyeLeft.DetectMultiScale(grayFaceValida, 1.01, 2, new Size(25, 15));
+                var eyeDireito = _classifierEyeRight.DetectMultiScale(grayFaceValida, 1.01, 2, new Size(25, 15));
+
+                if (eyeEsquerdo.Length > 0 && eyeDireito.Length > 0)
+                {
+                    var imgFace = imagem.Copy();
+
+                    var recFace = faceValida[0];
+
+                    recFace.Inflate(65, 65);
+
+                    imgFace.ROI = recFace;
+
+                    pictureBox2.Image = imgFace.Bitmap;
+
+                    imgFace.Bitmap.Save($@"E:\foto-{Guid.NewGuid()}.jpeg", ImageFormat.Jpeg);
+                }
+            }
+            
+            pictureBox1.Image = imagem.Bitmap;
         }
 
-        private void ProcessarFacePerfil(Image<Bgr, byte> imagem, Image<Gray, byte> gray)
+        private Image<Gray, byte> ConverterParaImageGray(Image<Bgr, byte> imagemOriginal, Rectangle? regiao)
         {
-            var haarFaceProf = new HaarCascade(@"..\..\haarcascade_profileface.xml");
+            var novaImagem = new Image<Gray, byte>(new Size(0, 0));
 
-            var facesProfDetected = gray.DetectHaarCascade(haarFaceProf, 1.05, 3, HAAR_DETECTION_TYPE.DO_CANNY_PRUNING, new Size(24, 24))[0];
+            novaImagem = regiao != null ? imagemOriginal.Copy(regiao.GetValueOrDefault()).Convert<Gray, byte>() : imagemOriginal.Convert<Gray, byte>();
 
-            if (facesProfDetected.Length > 0)
-                ProcessarItensDaFace(facesProfDetected, imagem, gray);
+            novaImagem._EqualizeHist();
+
+            return novaImagem;
         }
     }
 }
